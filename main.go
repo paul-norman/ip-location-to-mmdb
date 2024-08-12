@@ -24,7 +24,7 @@ type UserInput struct {
 
 func main() {
 	userInput := handleUserInput()
-fmt.Println(userInput)
+
 	switch userInput.fileType {
 		case "country":	loadCountries(userInput)
 		case "asn":		loadASNs(userInput)
