@@ -51,7 +51,7 @@ func loadCountries(userInput UserInput) {
 		}
 
 		mmdbRowData := mmdbtype.Map{
-			"country": mmdbtype.String(record[2]),
+			"country_code": mmdbtype.String(record[2]),
 		}
 
 		ipRanges := findIPRanges(record[0], record[1])
@@ -87,8 +87,8 @@ func loadASNs(userInput UserInput) {
 		number, _ := strconv.Atoi(record[2])
 
 		mmdbRowData := mmdbtype.Map{
-			"number":		mmdbtype.Uint32(number),
-			"organisation":	mmdbtype.String(record[3]),
+			"autonomous_system_number":			mmdbtype.Uint32(number),
+			"autonomous_system_organization":	mmdbtype.String(record[3]),
 		}
 
 		ipRanges := findIPRanges(record[0], record[1])
@@ -120,18 +120,18 @@ func loadCities(userInput UserInput) {
 		if err != nil {
 			break
 		}
-		lat, _ := strconv.ParseFloat(record[7], 64)
-		lon, _ := strconv.ParseFloat(record[8], 64)
+		//lat, _ := strconv.ParseFloat(record[7], 64)
+		//lon, _ := strconv.ParseFloat(record[8], 64)
 
 		mmdbRowData := mmdbtype.Map{
 			"city":			mmdbtype.String(record[5]),
 			"postcode":		mmdbtype.String(record[6]),
 			"timezone":		mmdbtype.String(record[9]),
-			"country":		mmdbtype.String(record[2]),
-			"latitude":		mmdbtype.Float64(lat),
-			"longitude":	mmdbtype.Float64(lon),
-			"state_1":		mmdbtype.String(record[3]),
-			"state_2":		mmdbtype.String(record[4]),
+			"country_code":	mmdbtype.String(record[2]),
+			"latitude":		mmdbtype.String(record[7]),
+			"longitude":	mmdbtype.String(record[8]),
+			"state1":		mmdbtype.String(record[3]),
+			"state2":		mmdbtype.String(record[4]),
 		}
 
 		ipRanges := findIPRanges(record[0], record[1])
