@@ -20,6 +20,7 @@ type UserInput struct {
 	outputPath	string
 	fileType	string
 	ipVersion	int
+	recordSize	int
 }
 
 func main() {
@@ -40,7 +41,7 @@ func loadCountries(userInput UserInput) {
 	defer csvFile.Close()
 
 	csvFileReader	:= csv.NewReader(csvFile)
-	mmDbWriter		:= initMmdbWriter(userInput.fileType, userInput.ipVersion, 24)
+	mmDbWriter		:= initMmdbWriter(userInput.fileType, userInput.ipVersion, userInput.recordSize)
 
 	fmt.Printf("Loading MMDB Country ipv%d data from: %s\n", userInput.ipVersion, userInput.inputPath)
 
@@ -74,7 +75,7 @@ func loadASNs(userInput UserInput) {
 	defer csvFile.Close()
 
 	csvFileReader	:= csv.NewReader(csvFile)
-	mmDbWriter		:= initMmdbWriter(userInput.fileType, userInput.ipVersion, 24)
+	mmDbWriter		:= initMmdbWriter(userInput.fileType, userInput.ipVersion, userInput.recordSize)
 
 	fmt.Printf("Loading MMDB ASN ipv%d data from: %s\n", userInput.ipVersion, userInput.inputPath)
 
@@ -111,7 +112,7 @@ func loadCities(userInput UserInput) {
 	defer csvFile.Close()
 
 	csvFileReader	:= csv.NewReader(csvFile)
-	mmDbWriter		:= initMmdbWriter(userInput.fileType, userInput.ipVersion, 28)
+	mmDbWriter		:= initMmdbWriter(userInput.fileType, userInput.ipVersion, userInput.recordSize)
 
 	fmt.Printf("Loading MMDB City ipv%d data from: %s\n", userInput.ipVersion, userInput.inputPath)
 
@@ -201,13 +202,15 @@ func findIPRanges(ipRangeStart string, ipRangeEnd string) []*net.IPNet {
 }
 
 func handleUserInput() UserInput {
-	input1	:= flag.String("i", "", "The input CSV file path")
-	input2	:= flag.String("input", "", "The input CSV file path")
-	output1	:= flag.String("o", "", "The output MMDB file path")
-	output2	:= flag.String("output", "", "The output MMDB file path")
-	type1	:= flag.String("t", "", "The type of file to process (country, asn or city)")
-	type2	:= flag.String("type", "", "The type of file to process (country, asn or city)")
-	ipv		:= flag.Int("ipv", 0, "The IP Version of the data file")
+	input1		:= flag.String("i", "", "The input CSV file path")
+	input2		:= flag.String("input", "", "The input CSV file path")
+	output1		:= flag.String("o", "", "The output MMDB file path")
+	output2		:= flag.String("output", "", "The output MMDB file path")
+	type1		:= flag.String("t", "", "The type of file to process (country, asn or city)")
+	type2		:= flag.String("type", "", "The type of file to process (country, asn or city)")
+	ipv			:= flag.Int("ipv", 0, "The IP Version of the data file")
+	recordSize1 := flag.Int("record_size", 0, "The record size of the MMDB file")
+	recordSize2 := flag.Int("r", 0, "The record size of the MMDB file")
 	flag.Parse()
 
 	var input string
@@ -268,5 +271,24 @@ func handleUserInput() UserInput {
 		panic("an IP Version is required: `4` or `6`")
 	}
 
-	return UserInput{ input, output, fileType, ipVersion }
+	var recordSize int
+	if *recordSize1 > 0 {
+		recordSize = *recordSize1
+	} else if *recordSize2 > 0 {
+		recordSize = *recordSize2
+	} else if len(test) > 0 {
+		if strings.Contains(test, "country") || strings.Contains(test, "countries") {
+			recordSize = 24
+		} else if strings.Contains(test, "asn") {
+			recordSize = 24
+		} else if strings.Contains(test, "city") || strings.Contains(test, "cities") {
+			recordSize = 28
+		}
+	}
+
+	if recordSize != 24 && recordSize != 28 && recordSize != 32 {
+		panic("an MMDB record size is required: `24`, `28` or `32`")
+	}
+
+	return UserInput{ input, output, fileType, ipVersion, recordSize }
 }
