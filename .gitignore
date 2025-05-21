@@ -11,7 +11,7 @@ logs
 # vim swap files
 *.swp
 
-# webstorm
+# Goland
 .idea
 
 # vscode
@@ -24,3 +24,4 @@ builds
 # DB files
 *.csv
 *.mmdb
+*.gz
