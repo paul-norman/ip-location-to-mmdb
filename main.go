@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -51,34 +52,15 @@ func loadCountries(userInput UserInput) {
 	mmDbWriter := initMmdbWriter(userInput.fileType, userInput.ipVersion, userInput.recordSize)
 
 	for _, inputFile := range userInput.inputPath {
-		csvFile, err := os.Open(inputFile)
-		if err != nil {
-			panic(err)
-		}
-		defer csvFile.Close()
-
-		csvFileReader := csv.NewReader(csvFile)
-
 		fmt.Printf("Loading MMDB Country data from: %s\n", inputFile)
 
-		for {
-			record, err := csvFileReader.Read()
-			if err != nil {
-				break
-			}
-
+		readCsvFile(inputFile, 3, func(record []string) {
 			mmdbRowData := mmdbtype.Map{
 				"country_code": mmdbtype.String(record[2]),
 			}
 
-			ipRanges := findIPRanges(record[0], record[1])
-			for _, ipRange := range ipRanges {
-				err := mmDbWriter.Insert(ipRange, mmdbRowData)
-				if err != nil {
-					panic(err)
-				}
-			}
-		}
+			insertIPRange(mmDbWriter, record[0], record[1], mmdbRowData)
+		})
 	}
 
 	saveMmdbData(mmDbWriter, userInput.outputPath, userInput.compress)
@@ -88,37 +70,21 @@ func loadASNs(userInput UserInput) {
 	mmDbWriter := initMmdbWriter(userInput.fileType, userInput.ipVersion, userInput.recordSize)
 
 	for _, inputFile := range userInput.inputPath {
-		csvFile, err := os.Open(inputFile)
-		if err != nil {
-			panic(err)
-		}
-		defer csvFile.Close()
-
-		csvFileReader := csv.NewReader(csvFile)
-
 		fmt.Printf("Loading MMDB ASN data from: %s\n", inputFile)
 
-		for {
-			record, err := csvFileReader.Read()
+		readCsvFile(inputFile, 4, func(record []string) {
+			number, err := strconv.ParseUint(record[2], 10, 32)
 			if err != nil {
-				break
+				panic(fmt.Errorf("invalid ASN %q: %w", record[2], err))
 			}
-
-			number, _ := strconv.Atoi(record[2])
 
 			mmdbRowData := mmdbtype.Map{
 				"autonomous_system_number":			mmdbtype.Uint32(number),
 				"autonomous_system_organization":	mmdbtype.String(record[3]),
 			}
 
-			ipRanges := findIPRanges(record[0], record[1])
-			for _, ipRange := range ipRanges {
-				err := mmDbWriter.Insert(ipRange, mmdbRowData)
-				if err != nil {
-					panic(err)
-				}
-			}
-		}
+			insertIPRange(mmDbWriter, record[0], record[1], mmdbRowData)
+		})
 	}
 
 	saveMmdbData(mmDbWriter, userInput.outputPath, userInput.compress)
@@ -128,24 +94,9 @@ func loadCities(userInput UserInput) {
 	mmDbWriter := initMmdbWriter(userInput.fileType, userInput.ipVersion, userInput.recordSize)
 
 	for _, inputFile := range userInput.inputPath {
-		csvFile, err := os.Open(inputFile)
-		if err != nil {
-			panic(err)
-		}
-		defer csvFile.Close()
-
-		csvFileReader := csv.NewReader(csvFile)
-
 		fmt.Printf("Loading MMDB City data from: %s\n", inputFile)
 
-		for {
-			record, err := csvFileReader.Read()
-			if err != nil {
-				break
-			}
-			//lat, _ := strconv.ParseFloat(record[7], 64)
-			//lon, _ := strconv.ParseFloat(record[8], 64)
-
+		readCsvFile(inputFile, 10, func(record []string) {
 			mmdbRowData := mmdbtype.Map{
 				"city":			mmdbtype.String(record[5]),
 				"postcode":		mmdbtype.String(record[6]),
@@ -155,23 +106,57 @@ func loadCities(userInput UserInput) {
 				"state2":		mmdbtype.String(record[4]),
 			}
 			if record[7] != "" && record[8] != "" {
-				lat, _ := strconv.ParseFloat(record[7], 32)
-				lon, _ := strconv.ParseFloat(record[8], 32)
-				mmdbRowData["latitude"] = mmdbtype.Float32(lat)
-				mmdbRowData["longitude"] = mmdbtype.Float32(lon)
-			}
-
-			ipRanges := findIPRanges(record[0], record[1])
-			for _, ipRange := range ipRanges {
-				err := mmDbWriter.Insert(ipRange, mmdbRowData)
-				if err != nil {
-					panic(err)
+				lat, latErr := strconv.ParseFloat(record[7], 32)
+				lon, lonErr := strconv.ParseFloat(record[8], 32)
+				if latErr == nil && lonErr == nil {
+					mmdbRowData["latitude"] = mmdbtype.Float32(lat)
+					mmdbRowData["longitude"] = mmdbtype.Float32(lon)
 				}
 			}
-		}
+
+			insertIPRange(mmDbWriter, record[0], record[1], mmdbRowData)
+		})
 	}
 
 	saveMmdbData(mmDbWriter, userInput.outputPath, userInput.compress)
+}
+
+// Reads every record of a CSV file, failing loudly on malformed rows rather than silently truncating the data
+func readCsvFile(filePath string, minFields int, handleRecord func(record []string)) {
+	csvFile, err := os.Open(filePath)
+	if err != nil {
+		panic(err)
+	}
+	defer csvFile.Close()
+
+	csvFileReader := csv.NewReader(csvFile)
+
+	for {
+		record, err := csvFileReader.Read()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			panic(fmt.Errorf("%s: %w", filePath, err))
+		}
+
+		if len(record) < minFields {
+			line, _ := csvFileReader.FieldPos(0)
+			panic(fmt.Errorf("%s: line %d: expected at least %d fields, got %d", filePath, line, minFields, len(record)))
+		}
+
+		handleRecord(record)
+	}
+}
+
+func insertIPRange(mmDbWriter *mmdbwriter.Tree, ipRangeStart string, ipRangeEnd string, mmdbRowData mmdbtype.Map) {
+	ipRanges := findIPRanges(ipRangeStart, ipRangeEnd)
+	for _, ipRange := range ipRanges {
+		err := mmDbWriter.Insert(ipRange, mmdbRowData)
+		if err != nil {
+			panic(err)
+		}
+	}
 }
 
 func initMmdbWriter(fileType string, ipVersion int, recordSize int) *mmdbwriter.Tree {
@@ -214,7 +199,10 @@ func saveMmdbData(mmDbWriter *mmdbwriter.Tree, filePath string, compress int) {
 		panic(err)
 	}
 
-	fileHandle.Close()
+	err = fileHandle.Close()
+	if err != nil {
+		panic(err)
+	}
 
 	if compress == 1 {
 		err = compressFile(filePath)
@@ -239,21 +227,26 @@ func compressFile(filePath string) error {
 	}
 	defer reader.Close()
 
-    writer, err := os.Create(filePath + ".gz")
-    if err != nil {
+	writer, err := os.Create(filePath + ".gz")
+	if err != nil {
 		return err
 	}
 	defer writer.Close()
 
 	gzWriter := gzip.NewWriter(writer)
-	defer gzWriter.Close()
 
 	_, err = io.Copy(gzWriter, reader)
-    if err != nil {
-        return err
-    }
+	if err != nil {
+		return err
+	}
 
-	return nil
+	// Close flushes the remaining compressed data, so its error must not be ignored
+	err = gzWriter.Close()
+	if err != nil {
+		return err
+	}
+
+	return writer.Close()
 }
 
 func findIPRanges(ipRangeStart string, ipRangeEnd string) []*net.IPNet {
@@ -262,6 +255,13 @@ func findIPRanges(ipRangeStart string, ipRangeEnd string) []*net.IPNet {
 
 	addressStart	:= ipStart.GetAddress()
 	addressEnd		:= ipEnd.GetAddress()
+
+	if addressStart == nil || addressEnd == nil {
+		panic(fmt.Errorf("invalid IP range: %q - %q", ipRangeStart, ipRangeEnd))
+	}
+	if addressStart.IsIPv4() != addressEnd.IsIPv4() {
+		panic(fmt.Errorf("IP range mixes IPv4 and IPv6: %q - %q", ipRangeStart, ipRangeEnd))
+	}
 
 	ipRange		:= addressStart.SpanWithRange(addressEnd)
 	rangeSlice	:= ipRange.SpanWithPrefixBlocks()
@@ -309,7 +309,8 @@ func handleUserInput() UserInput {
 		panic("an input CSV file is required")
 	}
 
-	test := strings.ToLower(input[0])
+	// Only inspect the file name, so that directory names cannot affect the detected type / IP version
+	test := strings.ToLower(filepath.Base(input[0]))
 
 	var output string
 	if len(*output1) > 0 {
@@ -317,11 +318,21 @@ func handleUserInput() UserInput {
 	} else if len(*output2) > 0 {
 		output = *output2
 	} else {
-		output = strings.Replace(input[0], ".csv", ".mmdb", 1)
+		dir		:= filepath.Dir(input[0])
+		base	:= filepath.Base(input[0])
+		base	= strings.TrimSuffix(base, filepath.Ext(base)) + ".mmdb"
 
 		if len(input) > 1 {
-			output = strings.Replace(output, "-ipv4", "-ipvAll", 1)
-			output = strings.Replace(output, "-ipv6", "-ipvAll", 1)
+			base = strings.Replace(base, "-ipv4", "-ipvAll", 1)
+			base = strings.Replace(base, "-ipv6", "-ipvAll", 1)
+		}
+
+		output = filepath.Join(dir, base)
+	}
+
+	for _, inputFile := range input {
+		if filepath.Clean(inputFile) == filepath.Clean(output) {
+			panic("the output MMDB file path must not be the same as an input CSV file path")
 		}
 	}
 
@@ -357,6 +368,10 @@ func handleUserInput() UserInput {
 		} else if strings.Contains(test, "ipv6") {
 			ipVersion = 6
 		}
+	}
+
+	if ipVersion != 0 && ipVersion != 4 && ipVersion != 6 {
+		panic("a valid IP Version is required: `4` or `6`")
 	}
 
 	if len(input) == 1 && ipVersion != 4 && ipVersion != 6 {

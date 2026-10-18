@@ -93,8 +93,8 @@ dev: update
 	go run .
 
 # Run commands
-run: clean build
-	./builds/$(BINARY_NAME)
+run: update
+	go run .
 
 # Test commands
 test: update
