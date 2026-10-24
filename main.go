@@ -37,6 +37,7 @@ type UserInput struct {
 	recordSize	int
 	compress	int
 	geoip2		bool
+	description	string
 }
 
 func main() {
@@ -50,7 +51,7 @@ func main() {
 }
 
 func loadCountries(userInput UserInput) {
-	mmDbWriter := initMmdbWriter(userInput.fileType, userInput.ipVersion, userInput.recordSize, userInput.geoip2)
+	mmDbWriter := initMmdbWriter(userInput.fileType, userInput.ipVersion, userInput.recordSize, userInput.geoip2, userInput.description)
 
 	for _, inputFile := range userInput.inputPath {
 		fmt.Printf("Loading MMDB Country data from: %s\n", inputFile)
@@ -72,7 +73,7 @@ func loadCountries(userInput UserInput) {
 }
 
 func loadASNs(userInput UserInput) {
-	mmDbWriter := initMmdbWriter(userInput.fileType, userInput.ipVersion, userInput.recordSize, userInput.geoip2)
+	mmDbWriter := initMmdbWriter(userInput.fileType, userInput.ipVersion, userInput.recordSize, userInput.geoip2, userInput.description)
 
 	for _, inputFile := range userInput.inputPath {
 		fmt.Printf("Loading MMDB ASN data from: %s\n", inputFile)
@@ -96,7 +97,7 @@ func loadASNs(userInput UserInput) {
 }
 
 func loadCities(userInput UserInput) {
-	mmDbWriter := initMmdbWriter(userInput.fileType, userInput.ipVersion, userInput.recordSize, userInput.geoip2)
+	mmDbWriter := initMmdbWriter(userInput.fileType, userInput.ipVersion, userInput.recordSize, userInput.geoip2, userInput.description)
 
 	for _, inputFile := range userInput.inputPath {
 		fmt.Printf("Loading MMDB City data from: %s\n", inputFile)
@@ -164,7 +165,7 @@ func insertIPRange(mmDbWriter *mmdbwriter.Tree, ipRangeStart string, ipRangeEnd 
 	}
 }
 
-func initMmdbWriter(fileType string, ipVersion int, recordSize int, geoip2 bool) *mmdbwriter.Tree {
+func initMmdbWriter(fileType string, ipVersion int, recordSize int, geoip2 bool, description string) *mmdbwriter.Tree {
 	var databaseType string
 	switch {
 		case geoip2 && fileType == "country":	databaseType = "Country (compat=GeoLite2-Country)"
@@ -190,6 +191,10 @@ func initMmdbWriter(fileType string, ipVersion int, recordSize int, geoip2 bool)
 			IncludeReservedNetworks:	true,
 			DisableIPv4Aliasing:		true,
 		}
+	}
+
+	if description != "" {
+		options.Description = map[string]string{ "en": description }
 	}
 
 	mmDbWriter, err := mmdbwriter.New(options)
@@ -310,6 +315,7 @@ func handleUserInput() UserInput {
 	compress1	:= flag.Int("compress", 0, "Should the MMDB file be compressed?")
 	compress2	:= flag.Int("z", 0, "Should the MMDB file be compressed?")
 	geoip2		:= flag.Bool("geoip2", false, "Use MaxMind's record layout and database type")
+	description	:= flag.String("description", "", "The description stored in the MMDB metadata")
 	flag.Parse()
 
 	if len(input1) > 0 {
@@ -424,5 +430,5 @@ func handleUserInput() UserInput {
 		panic("a valid compression flag is either: `0` or `1`")
 	}
 
-	return UserInput{ input, output, fileType, ipVersion, recordSize, compress, *geoip2 }
+	return UserInput{ input, output, fileType, ipVersion, recordSize, compress, *geoip2, *description }
 }

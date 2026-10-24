@@ -17,6 +17,7 @@ The tool is designed to accept a correctly formatted CSV file input and convert 
 | -`record_size` | -r    | The MMDB [Record Size](https://github.com/maxmind/MaxMind-DB/blob/main/MaxMind-DB-spec.md): `24`, `28` or `32`<br/><br/> *If omitted, the file name will be checked and a sensible default chosen* | No          |
 | -`compress`    | -z    | Gzip the output MMDB file for distribution                                                                                                                                                         | No          |
 | -`geoip2`      | N/A   | Use MaxMind's record layout and database type *(see below)*                                                                                                                                        | No          |
+| -`description` | N/A   | A description stored in the MMDB metadata, e.g. the data source and licence<br/><br/>*If omitted, `maxminddb-golang`'s `Verify()` rejects the file for having no description*                      | No          |
 
 ```Shell
 ip-location-to-mmdb -i /path/to/input.csv -o /path/to/output.mmdb -t country -ipv 4 -r 24
