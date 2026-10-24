@@ -16,6 +16,7 @@ The tool is designed to accept a correctly formatted CSV file input and convert 
 | -`ipv`         | N/A   | The IP version that is being converted: `4` or `6`<br/><br/> *If omitted, the file name will be checked*                                                                                           | No          |
 | -`record_size` | -r    | The MMDB [Record Size](https://github.com/maxmind/MaxMind-DB/blob/main/MaxMind-DB-spec.md): `24`, `28` or `32`<br/><br/> *If omitted, the file name will be checked and a sensible default chosen* | No          |
 | -`compress`    | -z    | Gzip the output MMDB file for distribution                                                                                                                                                         | No          |
+| -`geoip2`      | N/A   | Use MaxMind's record layout and database type *(see below)*                                                                                                                                        | No          |
 
 ```Shell
 ip-location-to-mmdb -i /path/to/input.csv -o /path/to/output.mmdb -t country -ipv 4 -r 24
@@ -32,6 +33,10 @@ To combine the IPV4 and IPV6 files:
 ```Shell
 ip-location-to-mmdb -i /path/to/dbip-country-ipv4.csv -i /path/to/dbip-country-ipv6.csv -o /path/to/dbip-country-ipall.mmdb -t country -r 24
 ```
+
+## MaxMind compatibility
+
+`-geoip2` adds `country.iso_code` to country records *(keeping `country_code`)* and sets `database_type` to `Country (compat=GeoLite2-Country)` or `ASN (compat=GeoLite2-ASN)`, which MaxMind's Python reader checks for. ASN records already match. City input is not supported. MaxMind's Go `geoip2` library only accepts a fixed list of names and still rejects these files.
 
 ## Building
 
